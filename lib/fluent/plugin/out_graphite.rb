@@ -19,20 +19,15 @@ class Fluent::GraphiteOutput < Fluent::BufferedOutput
 
   def initialize
     super
-    require 'graphite-api'
   end
 
   def start
     super
-    @client = GraphiteAPI.new(graphite: "#{@host}:#{@port}")
+    @client = Graphite.new(@host, @port)
   end
 
   def shutdown
     super
-  end
-
-  def format(tag, time, record)
-    record.to_msgpack
   end
 
   def configure(conf)
@@ -57,14 +52,18 @@ class Fluent::GraphiteOutput < Fluent::BufferedOutput
     end
   end
 
+  def format(tag, time, record)
+    [tag, time, record].to_msgpack
+  end
+
   def write(chunk)
-    time = Time.now.to_i
-    chunk.msgpack_each { |record|
+    chunk.msgpack_each { |tag, time, record|
       emit_tag = tag.dup
       filter_record(emit_tag, time, record)
       next unless metrics = format_metrics(emit_tag, record)
-      message = []
-      @client.metrics(metrics, time)
+
+      # implemented to immediate call post method in this loop, because graphite-api.gem has the buffers.
+      post(metrics, time)
     }
   end
 
@@ -92,4 +91,24 @@ class Fluent::GraphiteOutput < Fluent::BufferedOutput
     metrics
   end
 
+  def post(metrics, time)
+    @client.post(metrics, time)
+  end
+
+  class Graphite
+    attr_reader :host, :port
+    def initialize(host, port)
+      @host = host
+      @port = port
+    end
+
+    def post(message, time)
+      TCPSocket.open(@host, @port) { |socket|
+        message.each { |key, value|
+          msg = "#{key} #{value} #{time}\n"
+          socket.write(msg)
+        }
+      }
+    end
+  end
 end
