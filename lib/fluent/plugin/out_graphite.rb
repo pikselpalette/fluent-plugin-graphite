@@ -1,6 +1,6 @@
 require 'fluent/mixin/rewrite_tag_name'
 
-class Fluent::GraphiteOutput < Fluent::Output
+class Fluent::GraphiteOutput < Fluent::BufferedOutput
   Fluent::Plugin.register_output('graphite', self)
 
   include Fluent::HandleTagNameMixin
@@ -27,6 +27,14 @@ class Fluent::GraphiteOutput < Fluent::Output
     @client = GraphiteAPI.new(graphite: "#{@host}:#{@port}")
   end
 
+  def shutdown
+    super
+  end
+
+  def format(tag, time, record)
+    record.to_msgpack
+  end
+
   def configure(conf)
     super
 
@@ -49,17 +57,15 @@ class Fluent::GraphiteOutput < Fluent::Output
     end
   end
 
-  def emit(tag, es, chain)
-    es.each do |time, record|
+  def write(chunk)
+    time = Time.now.to_i
+    chunk.msgpack_each { |record|
       emit_tag = tag.dup
       filter_record(emit_tag, time, record)
       next unless metrics = format_metrics(emit_tag, record)
-
-      # implemented to immediate call post method in this loop, because graphite-api.gem has the buffers.
-      post(metrics, time)
-    end
-
-    chain.next
+      message = []
+      @client.metrics(metrics, time)
+    }
   end
 
   def format_metrics(tag, record)
@@ -86,9 +92,4 @@ class Fluent::GraphiteOutput < Fluent::Output
     metrics
   end
 
-  def post(metrics, time)
-    @client.metrics(metrics, time)
-  rescue Errno::ECONNREFUSED
-    log.warn "out_graphite: connection refused by #{@host}:#{@port}"
-  end
 end
