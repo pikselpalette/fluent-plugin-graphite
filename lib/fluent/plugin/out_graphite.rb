@@ -1,6 +1,7 @@
 require 'fluent/mixin/rewrite_tag_name'
 
 class Fluent::GraphiteOutput < Fluent::BufferedOutput
+  class ConnectionFailure < StandardError; end
   Fluent::Plugin.register_output('graphite', self)
 
   include Fluent::HandleTagNameMixin
@@ -92,7 +93,16 @@ class Fluent::GraphiteOutput < Fluent::BufferedOutput
   end
 
   def post(metrics, time)
-    @client.post(metrics, time)
+    retries = 0
+    begin
+      @client.post(metrics, time)
+    rescue Exception => e
+      if retries < 2
+        retries += 1
+        retry
+      end
+      raise ConnectionFailure, "Could not push metrics to Graphite after #{retries} retries. #{e.message}"
+    end
   end
 
   class Graphite
