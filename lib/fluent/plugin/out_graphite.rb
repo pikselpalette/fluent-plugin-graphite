@@ -99,6 +99,8 @@ class Fluent::GraphiteOutput < Fluent::BufferedOutput
     rescue Exception => e
       if retries < 2
         retries += 1
+        log.warn "Could not push metrics to Graphite, resetting connection and trying again. #{e.message}"
+        sleep 2**retries
         retry
       end
       raise ConnectionFailure, "Could not push metrics to Graphite after #{retries} retries. #{e.message}"
