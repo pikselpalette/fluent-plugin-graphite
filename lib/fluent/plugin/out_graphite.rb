@@ -74,6 +74,8 @@ class Fluent::GraphiteOutput < Fluent::BufferedOutput
         data = data.to_f
       elsif data =~ /^\d+$/
         data = data.to_i
+      else
+        nil
       end
     end
     data
@@ -98,7 +100,8 @@ class Fluent::GraphiteOutput < Fluent::BufferedOutput
             end
 
       key = key.gsub(/(\s|\/)+/, '_') # cope with in the case of containing symbols or spaces in the key of the record like in_dstat.
-      metrics[key] = remap(v)
+      next unless v = remap(v)
+      metrics[key] = v
     end
     metrics
   end
