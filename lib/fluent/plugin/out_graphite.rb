@@ -68,6 +68,17 @@ class Fluent::GraphiteOutput < Fluent::BufferedOutput
     }
   end
 
+  def remap(data)
+    if data.is_a? String
+      if data =~ /^\d+\.\d+$/
+        data = data.to_f
+      elsif data =~ /^\d+$/
+        data = data.to_i
+      end
+    end
+    data
+  end
+
   def format_metrics(tag, record)
     filtered_record = if @name_keys
                         record.select { |k,v| @name_keys.include?(k) }
@@ -87,7 +98,7 @@ class Fluent::GraphiteOutput < Fluent::BufferedOutput
             end
 
       key = key.gsub(/(\s|\/)+/, '_') # cope with in the case of containing symbols or spaces in the key of the record like in_dstat.
-      metrics[key] = v.to_f
+      metrics[key] = remap(v)
     end
     metrics
   end
