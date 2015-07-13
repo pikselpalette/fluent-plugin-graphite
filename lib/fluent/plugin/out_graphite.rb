@@ -126,15 +126,30 @@ class Fluent::GraphiteOutput < Fluent::BufferedOutput
     def initialize(host, port)
       @host = host
       @port = port
+      @sock = nil
+      @sock_start = 0
     end
 
     def post(message, time)
-      TCPSocket.open(@host, @port) { |socket|
+        now = Time.now.to_i
+        if @sock_start < (now - 300)
+          @sock.close if @sock
+          @sock = nil
+        end
+        unless @sock
+          @sock = TCPSocket.new(@host, @port)
+          @sock_start = now
+        end
         message.each { |key, value|
-          msg = "#{key} #{value} #{time}\n"
-          socket.write(msg)
+          begin
+            msg = "#{key} #{value} #{time}\n"
+            @sock.write(msg)
+          rescue Exception => e
+            @sock.close if @sock
+            @sock = nil
+            raise e
+          end
         }
-      }
     end
   end
 end
