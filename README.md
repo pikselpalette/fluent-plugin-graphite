@@ -1,5 +1,6 @@
 # fluent-plugin-graphite [![Build Status](https://travis-ci.org/sgran/fluent-plugin-graphite.png)](https://travis-ci.org/sgran/fluent-plugin-graphite)
 
+
 fluentd output plugin to send metrics to graphite
 
 ## Installation
